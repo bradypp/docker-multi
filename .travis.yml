@@ -1,0 +1,35 @@
+sudo: required
+services:
+  - docker
+
+before_install:
+  - docker build -t bradypp/client-test -f ./client/Dockerfile.dev ./client
+
+script:
+  - docker run bradypp/client-test npm test -- --coverage
+
+after_success:
+  - docker build -t bradypp/multi-client ./client
+  - docker build -t bradypp/multi-nginx ./nginx
+  - docker build -t bradypp/multi-server ./server
+  - docker build -t bradypp/multi-worker ./worker
+  # Log in to the docker CLI
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_ID" --password-stdin
+  # Take those images and push them to docker hub
+  - docker push bradypp/multi-client
+  - docker push bradypp/multi-nginx
+  - docker push bradypp/multi-server
+  - docker push bradypp/multi-worker
+
+deploy:
+  provider: elasticbeanstalk
+  region: eu-west-1
+  app: multi-docker
+  env: MultiDocker-env
+  bucket_name: elasticbeanstalk-eu-west-1-306476627547
+  bucket_path: docker-multi
+  on:
+    branch: master
+  access_key_id: $AWS_ACCESS_KEY
+  secret_access_key:
+    secure: $AWS_SECRET_KEY
